@@ -14,6 +14,7 @@ let
         kwargs...)
         return Index(5, "Site,GaugeLink")
     end
+    println(1)
     ITensors.state(::StateName"Vaccum",::SiteType"GaugeLink")=[1.0,0,0,0]
     
     push!(sites,siteind("Electron"))
@@ -46,7 +47,7 @@ let
 
     Ugg[5, 1] =  s
     Ugg[1, 2] =  s
-    ITensor.op(::OpName"Urr",::SiteType"GaugeLink")=Urr
+    ITensors.op(::OpName"Urr",::SiteType"GaugeLink") = Urr
     #@show isdefined(Main, :ITensor)
     E_sqr_op= ITensor(E_sqr,prime(gauge_link),dag(gauge_link))
     Urr_op = ITensor(Urr, prime(gauge_link), dag(gauge_link))
@@ -54,7 +55,7 @@ let
     Ugr_op = ITensor(Ugr, prime(gauge_link), dag(gauge_link))
     Ugg_op = ITensor(Ugg, prime(gauge_link), dag(gauge_link))
 
-    #ITensors.op(::OpName"Urr", ::SiteType"GaugeLink") = Urr
+    ITensors.op(::OpName"Urr", ::SiteType"GaugeLink") = Urr
     ITensors.op(::OpName"Urg", ::SiteType"GaugeLink") = Urg
     ITensors.op(::OpName"Ugr", ::SiteType"GaugeLink") = Ugr
     ITensors.op(::OpName"Ugg", ::SiteType"GaugeLink") = Ugg
