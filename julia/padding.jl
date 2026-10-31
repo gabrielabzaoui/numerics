@@ -11,7 +11,7 @@ let
     H=OpSum()
     sweeps=30
     dt=0.01
-    time_steps=100
+    time_steps=50
     Mz_array_pad=zeros(time_steps)
     S_arrray_pad=zeros(time_steps)
     Mz_array=zeros(time_steps)
@@ -46,12 +46,14 @@ let
     instate=["Up" for i in 1:number_of_sites]
     #psi0=random_mps(sites)
     ψ_0 =MPS(sites,instate)
-    ψ_pad=ψ_0
+    ψ_pad= 0.0 * random_mps(sites; linkdims=50)
+
+    ψ_pad = +(ψ_0, ψ_pad; alg="directsum")
     @time for i=1:time_steps
         
        
         task_one= Threads.@spawn begin
-            ψ_0 = tdvp(H_mpo,-1im*dt,ψ_0;nsteps=1, time_step=-1im * dt,normalize=false,cutoff=1e-13,nsite=1)
+            ψ_0 = tdvp(H_mpo,-1im*dt,ψ_0;nsteps=1, time_step=-1im * dt,normalize=false,cutoff=1e-13,nsite=2)
             m = expect(ψ_0, "Sz")
             Mz_array[i] = sum(m) / length(m)
             S_arrray[i] = entaglement_entropy(ψ_0)
@@ -63,7 +65,7 @@ let
         task_two = Threads.@spawn begin
             
         
-            ψ_pad = tdvp(H_mpo,-1im*dt,ψ_pad;nsteps=1, time_step=-1im * dt,normalize=false,cutoff=1e-13,nsite=2)
+            ψ_pad = tdvp(H_mpo,-1im*dt,ψ_pad;nsteps=1, time_step=-1im * dt,normalize=false,cutoff=1e-13,nsite=1)
             m = expect(ψ_pad, "Sz")
             Mz_array_pad[i] = sum(m) / length(m)
             S_arrray_pad[i] = entaglement_entropy(ψ_pad)
@@ -76,6 +78,7 @@ let
         wait(task_one)
         wait(task_two)
         println(i)
+        @show linkdims(ψ_0)
         #println( "Minimale norm:", minimum(norm_pad))
     end
 
