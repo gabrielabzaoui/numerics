@@ -32,11 +32,51 @@ H2 = kron(I2, H)
 
 S1 = kron(S, I2)
 S2 = kron(I2, S)
+# Controlled-Z
+CZ = ComplexF64[
+    1 0 0  0
+    0 1 0  0
+    0 0 1  0
+    0 0 0 -1
+]
 
-List = [H1, H2, S1, S2, CNOT]
+# Controlled-Y (first qubit is control)
+CY = ComplexF64[
+    1 0 0  0
+    0 1 0  0
+    0 0 0 -im
+    0 0 im  0
+]
+
+# Reverse CNOT (second qubit is control)
+CNOT_rev = ComplexF64[
+    1 0 0 0
+    0 0 0 1
+    0 0 1 0
+    0 1 0 0
+]
+
+# SWAP
+SWAP = ComplexF64[
+    1 0 0 0
+    0 0 1 0
+    0 1 0 0
+    0 0 0 1
+]
+
+# iSWAP
+iSWAP = ComplexF64[
+    1 0 0  0
+    0 0 im 0
+    0 im 0 0
+    0 0 0  1
+]
+
+List = [H1, H2, S1, S2, CNOT,CZ, CY,CNOT_rev,SWAP,iSWAP]
 
 
 function optimization(psi::MPS,N)
+    psi_out=deepcopy(psi)
     for i=1:N
         for i=1:length(psi)-1
         
@@ -47,8 +87,8 @@ function optimization(psi::MPS,N)
             theta=cliffordaug_sites(psi[i]*psi[i+1],left_ind,s1,s2)
             
             U, S, V=svd(theta,left_ind)    
-            psi[i]=U*S
-            psi[i+1]=V
+            psi_out[i]=U*S
+            psi_out[i+1]=V
         end
         for i in (length(psi)-1):-1:1
             theta=psi[i]*psi[i+1]
@@ -62,7 +102,7 @@ function optimization(psi::MPS,N)
             psi[i+1]=V
         end
     end    
-    return psi
+    return psi_out
 end
 
 function cliffordaug_sites(theta,left_ind,s1,s2)

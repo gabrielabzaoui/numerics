@@ -7,10 +7,10 @@ using .cliffordaug
     
 
 
-N = 30                 # Number of spins
+N = 12                 # Number of spins
 J = 1.0                 # Heisenberg coupling
 dt = 0.1               # Time step
-tmax = 1              # Total evolution time
+tmax = 1.5              # Total evolution time
 
 maxdim = 100            # Maximum MPS bond dimension
 cutoff = 1E-10          # SVD truncation cutoff
@@ -48,13 +48,20 @@ for step in 1:nsteps
         normalize=true
     )
 
+    S_before = cliffordaug.entanglement(psi,middle)
+    psi_opt = cliffordaug.optimization(deepcopy(psi), 2)
+    S_after = cliffordaug.entanglement(psi_opt,middle)
+
+    println("Before: $S_before")
+    println("After:  $S_after")
+    println("Diff:   $(S_before - S_after)")
     # Measure entanglement
-    entropy = cliffordaug.entanglement(psi, middle)
+    #psi_opt = cliffordaug.optimization(psi,4)
 
-    push!(times, step*dt)
-    push!(entropies, entropy)
-
-    println("t = $(round(step*dt,digits=3)), S = $entropy")
+    #println(
+    #"S diff = $(cliffordaug.entanglement(psi, middle)-cliffordaug.entanglement(psi_opt, middle))"
+    #)
+   
 end
-beta=cliffordaug.optimization(psi,4)
+
 end
