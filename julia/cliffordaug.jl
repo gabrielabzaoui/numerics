@@ -76,10 +76,11 @@ List = [H1, H2, S1, S2, CNOT,CZ, CY,CNOT_rev,SWAP,iSWAP]
 
 
 function optimization(psi::MPS,N)
-    psi_out=deepcopy(psi)
+    
     for i=1:N
         for i=1:length(psi)-1
-        
+            orthogonalize!(psi, i)
+            
             theta=psi[i]*psi[i+1]
             s1=siteind(psi,i)
             s2=siteind(psi,i+1)
@@ -87,10 +88,11 @@ function optimization(psi::MPS,N)
             theta=cliffordaug_sites(psi[i]*psi[i+1],left_ind,s1,s2)
             
             U, S, V=svd(theta,left_ind)    
-            psi_out[i]=U*S
-            psi_out[i+1]=V
+            psi[i]=U*S
+            psi[i+1]=V
         end
         for i in (length(psi)-1):-1:1
+            orthogonalize!(psi, i)
             theta=psi[i]*psi[i+1]
             s1=siteind(psi,i)
             s2=siteind(psi,i+1)
@@ -102,7 +104,7 @@ function optimization(psi::MPS,N)
             psi[i+1]=V
         end
     end    
-    return psi_out
+    return psi
 end
 
 function cliffordaug_sites(theta,left_ind,s1,s2)
