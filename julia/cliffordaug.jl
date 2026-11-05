@@ -36,21 +36,32 @@ S2 = kron(I2, S)
 List = [H1, H2, S1, S2, CNOT]
 
 
-function optimization(psi::MPS)
-
-    for i=1:length(psi)-1
-       
-        theta=psi[i]*psi[i+1]
-        s1=siteind(psi,i)
-        s2=siteind(psi,i+1)
-        left_ind=uniqueinds(psi[i],psi[i+1])
-        theta=cliffordaug_sites(psi[i]*psi[i+1],left_ind,s1,s2)
+function optimization(psi::MPS,N)
+    for i=1:N
+        for i=1:length(psi)-1
         
-        U, S, V=svd(theta,left_ind)    
-        psi[i]=U*S
-        psi[i+1]=V
+            theta=psi[i]*psi[i+1]
+            s1=siteind(psi,i)
+            s2=siteind(psi,i+1)
+            left_ind=uniqueinds(psi[i],psi[i+1])
+            theta=cliffordaug_sites(psi[i]*psi[i+1],left_ind,s1,s2)
+            
+            U, S, V=svd(theta,left_ind)    
+            psi[i]=U*S
+            psi[i+1]=V
+        end
+        for i in (length(psi)-1):-1:1
+            theta=psi[i]*psi[i+1]
+            s1=siteind(psi,i)
+            s2=siteind(psi,i+1)
+            left_ind=uniqueinds(psi[i],psi[i+1])
+            theta=cliffordaug_sites(psi[i]*psi[i+1],left_ind,s1,s2)
+            
+            U, S, V=svd(theta,left_ind)    
+            psi[i]=U*S
+            psi[i+1]=V
+        end
     end    
-    
     return psi
 end
 
@@ -61,10 +72,6 @@ function cliffordaug_sites(theta,left_ind,s1,s2)
     
     
     for U in List
-        println("dim(s1) = ", dim(s1))
-        println("dim(s2) = ", dim(s2))
-        println("left_ind = ", left_ind)
-        println("theta indices = ", inds(theta))
         U_tensor=ITensor(reshape(U,2,2,2,2),prime(s1),prime(s2),s1,s2)
         A=U_tensor*theta_opt
         A = replaceind(A, prime(s1), s1)

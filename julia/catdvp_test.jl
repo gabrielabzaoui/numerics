@@ -1,23 +1,23 @@
 using ITensors
 using ITensorMPS
 
-#include("cliffordaug.jl")
-#using .cliffordaug
 begin
+include("cliffordaug.jl")
+using .cliffordaug
     
 
 
-N = 5                  # Number of spins
+N = 30                 # Number of spins
 J = 1.0                 # Heisenberg coupling
 dt = 0.1               # Time step
-tmax = 2              # Total evolution time
+tmax = 1              # Total evolution time
 
 maxdim = 100            # Maximum MPS bond dimension
 cutoff = 1E-10          # SVD truncation cutoff
 
-sites=siteinds("S=1/2",5)
+sites=siteinds("S=1/2",N)
 psi=random_mps(sites)
-entanglement(psi,2)
+cliffordaug.entanglement(psi,2)
     
 h=OpSum()
 
@@ -49,14 +49,12 @@ for step in 1:nsteps
     )
 
     # Measure entanglement
-    entropy = entanglement(psi, middle)
+    entropy = cliffordaug.entanglement(psi, middle)
 
     push!(times, step*dt)
     push!(entropies, entropy)
 
     println("t = $(round(step*dt,digits=3)), S = $entropy")
 end
-methods(cliffordaug.optimization)
-methods(cliffordaug.cliffordaug_sites)
-beta=optimization(psi)
+beta=cliffordaug.optimization(psi,4)
 end
