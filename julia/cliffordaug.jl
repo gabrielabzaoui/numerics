@@ -3,6 +3,7 @@ module cliffordaug
 using ITensors
 using ITensorMPS
 using LinearAlgebra
+using Serialization
 #sites=siteinds("S=1/2",20)
 #psi=MPS(sites,["Up" for i=1:20])
 export optimization, entanglement
@@ -72,7 +73,8 @@ iSWAP = ComplexF64[
     0 0 0  1
 ]
 
-List = [H1, H2, S1, S2, CNOT,CZ, CY,CNOT_rev,SWAP,iSWAP]
+#List = [H1, H2, S1, S2, CNOT,CZ, CY,CNOT_rev,SWAP,iSWAP]
+List=deserialize("two_qubit_clifford_group.jls")
 
 
 function optimization(psi::MPS,N)
