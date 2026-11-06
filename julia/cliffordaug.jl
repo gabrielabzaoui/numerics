@@ -74,31 +74,8 @@ iSWAP = ComplexF64[
 ]
 
 #List = [H1, H2, S1, S2, CNOT,CZ, CY,CNOT_rev,SWAP,iSWAP]
-CliffordGroup=deserialize("two_qubit_clifford_group.jls")
+List=deserialize("two_qubit_clifford_group.jls")
 
-function precompute_gate_tensors(psi::MPS)
-
-    N = length(psi)
-
-    gate_cache = Vector{Vector{ITensor}}(undef, N-1)
-
-    for b in 1:N-1
-
-        s1 = siteind(psi, b)
-        s2 = siteind(psi, b+1)
-
-        gate_cache[b] = [
-            ITensor(
-                reshape(G, 2, 2, 2, 2),
-                prime(s1), prime(s2), s1, s2
-            )
-            for G in CliffordGroup
-        ]
-
-    end
-
-    return gate_cache
-end
 
 function optimization(psi::MPS,N)
     
