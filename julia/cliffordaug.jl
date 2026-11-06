@@ -74,8 +74,31 @@ iSWAP = ComplexF64[
 ]
 
 #List = [H1, H2, S1, S2, CNOT,CZ, CY,CNOT_rev,SWAP,iSWAP]
-List=deserialize("two_qubit_clifford_group.jls")
+CliffordGroup=deserialize("two_qubit_clifford_group.jls")
 
+function precompute_gate_tensors(psi::MPS)
+
+    N = length(psi)
+
+    gate_cache = Vector{Vector{ITensor}}(undef, N-1)
+
+    for b in 1:N-1
+
+        s1 = siteind(psi, b)
+        s2 = siteind(psi, b+1)
+
+        gate_cache[b] = [
+            ITensor(
+                reshape(G, 2, 2, 2, 2),
+                prime(s1), prime(s2), s1, s2
+            )
+            for G in CliffordGroup
+        ]
+
+    end
+
+    return gate_cache
+end
 
 function optimization(psi::MPS,N)
     
@@ -117,7 +140,7 @@ function cliffordaug_sites(theta,left_ind,s1,s2)
     
     for U in List
         U_tensor=ITensor(reshape(U,2,2,2,2),prime(s1),prime(s2),s1,s2)
-        A=U_tensor*theta_opt
+        A=U_tensor*theta
         A = replaceind(A, prime(s1), s1)
         A = replaceind(A, prime(s2), s2)
         S_canidate=entropy(A,left_ind)

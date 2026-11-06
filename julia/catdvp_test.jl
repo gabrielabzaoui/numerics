@@ -2,7 +2,7 @@ using ITensors
 using ITensorMPS
 
 begin
-include("cliffordaug.jl")
+include("cliffordaug2.0.jl")
 using .cliffordaug
     
 
@@ -18,6 +18,8 @@ cutoff = 1E-10          # SVD truncation cutoff
 sites=siteinds("S=1/2",N)
 psi=random_mps(sites)
 cliffordaug.entanglement(psi,2)
+@time gate_cache = precompute_gate_tensors(psi)
+println("finished cache")
     
 h=OpSum()
 
@@ -56,8 +58,8 @@ for step in 1:nsteps
     #)
    println(step)
 end
-S_before = cliffordaug.entanglement(psi,middle)
-    psi_opt = cliffordaug.optimization(deepcopy(psi), 2)
+    S_before = cliffordaug.entanglement(psi,middle)
+    @time psi_opt = cliffordaug.optimization(deepcopy(psi), 2,gate_cache)
     S_after = cliffordaug.entanglement(psi_opt,middle)
 
     println("Before: $S_before")
