@@ -60,14 +60,14 @@ begin
         for m=0:N-1
             if abs(n-m)>0
                 #Q1_nQ1_M+Q2_nQ2_m
-                H+=V(n,m)*0.5,"S-",g(n),"S+",r(n),"S-",r(m),"S+",g(m)
-                H+=V(n,m)*0.5,"S-",r(n),"S+",g(n),"S-",g(m),"S+",r(m)
+                global H+=V(n,m)*0.5,"S-",g(n),"S+",r(n),"S-",r(m),"S+",g(m)
+                global H+=V(n,m)*0.5,"S-",r(n),"S+",g(n),"S-",g(m),"S+",r(m)
 
                 #Q3_nQ3_m
-                H+=0.5*a(g_coupling^2)*V(n,m)*0.0625,"Z",g(n),"Z",g(m)
-                H+=0.5*a(g_coupling^2)*V(n,m)*-0.0625,"Z",g(n),"Z",r(m)
-                H+=0.5*a(g_coupling^2)*V(n,m)*-0.0625,"Z",r(n),"Z",g(m)
-                H+=0.5*a(g_coupling^2)*V(n,m)*0.0625,"Z",r(n),"Z",r(m)
+                global H+=0.5*a*(g_coupling^2)*V(n,m)*0.0625,"Z",g(n),"Z",g(m)
+                global H+=0.5*a*(g_coupling^2)*V(n,m)*-0.0625,"Z",g(n),"Z",r(m)
+                global H+=0.5*a*(g_coupling^2)*V(n,m)*-0.0625,"Z",r(n),"Z",g(m)
+                global H+=0.5*a*(g_coupling^2)*V(n,m)*0.0625,"Z",r(n),"Z",r(m)
             end
         end
     end
