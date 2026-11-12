@@ -2,63 +2,160 @@
 using LinearAlgebra
 using Serialization
 
-# Load complete Clifford group
-clifford_group = deserialize("two_qubit_clifford_group.jls")
+function generate_camps_cliffords()
 
-# Pauli matrices
-I2 = ComplexF64[1 0; 0 1]
-X  = ComplexF64[0 1; 1 0]
-Y  = ComplexF64[0 -im; im 0]
-Z  = ComplexF64[1 0; 0 -1]
+    # --------------------------------------------------
+    # 1. Single-qubit Clifford generators
+    # --------------------------------------------------
 
-# Generate all 16 two-qubit Pauli matrices
-paulis = [
-    kron(P1, P2)
-    for P1 in (I2, X, Y, Z), P2 in (I2, X, Y, Z)
-]
-paulis = vec(paulis)
+    I2 = Matrix{ComplexF64}(I, 2, 2)
 
+    H = ComplexF64[
+        1  1
+        1 -1
+    ] / sqrt(2)
 
-function canonical_key(M; tol=1e-8)
-    v = vec(ComplexF64.(M))
+    S = ComplexF64[
+        1 0
+        0 im
+    ]
 
-    idx = findfirst(z -> abs(z) > tol, v)
-    isnothing(idx) && error("Zero matrix encountered")
+    # Two-qubit generators
+    H1 = kron(H, I2)
+    H2 = kron(I2, H)
 
-    # Remove global phase
-    v ./= v[idx] / abs(v[idx])
+    S1 = kron(S, I2)
+    S2 = kron(I2, S)
 
-    # Convert complex entries into comparable real tuples
-    return Tuple(
-        Iterators.flatten(
-            ((round(real(z), digits=8),
-              round(imag(z), digits=8)) for z in v)
-        )
-    )
-end
+    # CNOT: first qubit controls second
+    CNOT12 = ComplexF64[
+        1 0 0 0
+        0 1 0 0
+        0 0 0 1
+        0 0 1 0
+    ]
 
-function coset_key(C, paulis)
-    keys = [canonical_key(P * C) for P in paulis]
-    return minimum(keys)
-end
+    # CNOT: second qubit controls first
+    SWAP = ComplexF64[
+        1 0 0 0
+        0 0 1 0
+        0 1 0 0
+        0 0 0 1
+    ]
 
-# Keep one representative per class
-clifford_720 = Matrix{ComplexF64}[]
-seen = Set{Any}()
+    CNOT21 = SWAP * CNOT12 * SWAP
 
-for C in clifford_group
-    key = coset_key(C, paulis)
+    generators = [H1, H2, S1, S2, CNOT12, CNOT21]
 
-    if !(key in seen)
-        push!(seen, key)
-        push!(clifford_720, ComplexF64.(C))
+    # --------------------------------------------------
+    # 2. Construct the 16 two-qubit Pauli operators
+    # --------------------------------------------------
+
+    X = ComplexF64[
+        0 1
+        1 0
+    ]
+
+    Y = ComplexF64[
+        0 -im
+        im 0
+    ]
+
+    Z = ComplexF64[
+        1 0
+        0 -1
+    ]
+
+    single_paulis = [I2, X, Y, Z]
+
+    paulis = [
+        kron(P1, P2)
+        for P1 in single_paulis, P2 in single_paulis
+    ]
+
+    paulis = vec(paulis)
+
+    # --------------------------------------------------
+    # 3. Identify a Clifford modulo Pauli operators
+    # --------------------------------------------------
+
+    function clifford_key(C)
+
+        key = Int[]
+
+        for P in paulis
+
+            # Clifford conjugation
+            Q = C * P * C'
+
+            # Identify which Pauli operator Q corresponds to.
+            # Ignore its sign.
+            overlaps = [
+                abs(tr(P2' * Q))
+                for P2 in paulis
+            ]
+
+            push!(key, argmax(overlaps))
+        end
+
+        return Tuple(key)
     end
+
+    # --------------------------------------------------
+    # 4. Breadth-first generation of the quotient group
+    # --------------------------------------------------
+
+    identity_gate = Matrix{ComplexF64}(I, 4, 4)
+
+    representatives = Matrix{ComplexF64}[]
+    queue = Matrix{ComplexF64}[]
+
+    seen = Set{Any}()
+
+    key = clifford_key(identity_gate)
+
+    push!(seen, key)
+    push!(queue, identity_gate)
+
+    head = 1
+
+    while head <= length(queue)
+
+        C = queue[head]
+        head += 1
+
+        for G in generators
+
+            Cnew = G * C
+
+            key = clifford_key(Cnew)
+
+            if !(key in seen)
+
+                push!(seen, key)
+                push!(queue, Cnew)
+
+            end
+        end
+
+    end
+
+    representatives = queue
+
+    println("Generated Clifford classes: ", length(representatives))
+
+    return representatives
 end
 
-println("Original gates: ", length(clifford_group))
-println("Filtered gates: ", length(clifford_720))
 
-# Save
-serialize("two_qubit_clifford_720.jls", clifford_720)
+# --------------------------------------------------
+# 5. Generate and save
+# --------------------------------------------------
+
+clifford_720 = generate_camps_cliffords()
 
 @assert length(clifford_720) == 720
+
+serialize("two_qubit_clifford_720.jls", clifford_720)
+
+println("Successfully saved 720 CAMPS Clifford representatives!")
