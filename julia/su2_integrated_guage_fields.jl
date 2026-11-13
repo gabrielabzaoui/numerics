@@ -7,12 +7,13 @@ begin
     sites=siteinds("S=1/2",2*N+2);#+2 external charges
     H=OpSum()
     number_of_sites=2*N
-    epsilon=1
-    m=5
+    
+    m=1
     r(i) = 2*i + 1
     g(i) = 2*i + 2
     g_coupling=1
     a=1
+    epsilon=1/(2*a)
     ext1_ind=2*N+1  #index of the external charges
     ext2_ind=2*N+2
     n1=4 #postion of external charge 1 model before the jordan wigner transform
@@ -111,13 +112,205 @@ begin
     H+=lambda*V(n1,n2)*0.5*2,"Sx",ext1_ind,"Sx",ext2_ind
     H+=lambda*V(n1,n2)*0.5*2,"Sy",ext1_ind,"Sy",ext2_ind
     H+=lambda*V(n1,n2)*0.5*2,"Sz",ext1_ind,"Sz",ext2_ind
-    d=0.7
-    H_mpo=MPO(H,sites);
-    psi_0=random_mps(sites)
-    E_0,psi=dmrg(H_mpo,psi_0;nsweeps=10,cutoff=1e-12,maxdim=200)
-    z_values = expect(psi, "Z")
-    n_r = [(1 - z_values[2*i+1])/2 for i in 0:N-1]
-    n_g = [(1 - z_values[2*i+2])/2 for i in 0:N-1]
-    scatter(1:length(n_r),n_r,marker=:square,color="red",label="n_r")
-    scatter!(1:length(n_g),n_g,marker=:circle,color="lightgreen",label="n_g")
+function total_colour_operators(Itensor_sites)
+
+    Qx_os = OpSum()
+    Qy_os = OpSum()
+    Qz_os = OpSum()
+
+    for i = 0:N-1
+
+        Qx_os +=  0.5, "S-", r(i), "S+", g(i)
+        Qx_os +=  0.5, "S+", r(i), "S-", g(i)
+
+        Qy_os += -0.5im, "S-", r(i), "S+", g(i)
+        Qy_os +=  0.5im, "S+", r(i), "S-", g(i)
+
+        Qz_os +=  0.25, "Z", g(i)
+        Qz_os += -0.25, "Z", r(i)
+
+    end
+
+    Qx_os += 1.0, "Sx", ext1_ind
+    Qx_os += 1.0, "Sx", ext2_ind
+
+    Qy_os += 1.0, "Sy", ext1_ind
+    Qy_os += 1.0, "Sy", ext2_ind
+
+    Qz_os += 1.0, "Sz", ext1_ind
+    Qz_os += 1.0, "Sz", ext2_ind
+
+    return MPO(Qx_os, Itensor_sites),
+           MPO(Qy_os, Itensor_sites),
+           MPO(Qz_os, Itensor_sites)
+end
+
+# ============================================
+# Construct total colour operators
+# ============================================
+
+Qx, Qy, Qz = total_colour_operators(sites)
+
+# ============================================
+# Construct total Casimir
+# ============================================
+
+cutoff_penalty = 1e-14
+
+Qx2_mpo = apply(Qx, Qx;
+                cutoff=cutoff_penalty,
+                maxdim=4000)
+
+Qy2_mpo = apply(Qy, Qy;
+                cutoff=cutoff_penalty,
+                maxdim=4000)
+
+Qz2_mpo = apply(Qz, Qz;
+                cutoff=cutoff_penalty,
+                maxdim=4000)
+
+Qtotal2_mpo = add(Qx2_mpo, Qy2_mpo;
+                  cutoff=cutoff_penalty,
+                  maxdim=4000)
+
+Qtotal2_mpo = add(Qtotal2_mpo, Qz2_mpo;
+                  cutoff=cutoff_penalty,
+                  maxdim=4000)
+
+# ============================================
+# Add colour neutrality penalty
+# ============================================
+
+kappa = 10.0
+
+H_base = MPO(H, sites)
+
+H_penalty = kappa * Qtotal2_mpo
+
+H_mpo = add(H_base, H_penalty;
+            cutoff=cutoff_penalty,
+            maxdim=4000)
+
+# ============================================
+# DMRG
+# ============================================
+
+psi_0 = random_mps(sites)
+
+E_0, psi = dmrg(H_mpo, psi_0;
+                nsweeps=20,
+                cutoff=1e-12,
+                maxdim=400)
+
+# ============================================
+# Measure total colour
+# ============================================
+
+Qx2 = real(inner(Qx, psi, Qx, psi))
+Qy2 = real(inner(Qy, psi, Qy, psi))
+Qz2 = real(inner(Qz, psi, Qz, psi))
+
+Qtotal2 = Qx2 + Qy2 + Qz2
+
+println("<Qx²> = ", Qx2)
+println("<Qy²> = ", Qy2)
+println("<Qz²> = ", Qz2)
+println("<Qtotal²> = ", Qtotal2)
+
+# ============================================
+# Matter occupation
+# ============================================
+
+z_values = expect(psi, "Z")
+
+n_r = [(1-z_values[2*i+1])/2 for i in 0:N-1]
+n_g = [(1-z_values[2*i+2])/2 for i in 0:N-1]
+
+scatter(1:N, n_r,
+        marker=:square,
+        color="red",
+        label="n_r")
+
+scatter!(1:N, n_g,
+         marker=:circle,
+         color="lightgreen",
+         label="n_g")
+
+
+# ============================================
+# Electric flux profile
+# ============================================
+
+function cumulative_colour_operators(sites, x)
+
+    Qx_os = OpSum()
+    Qy_os = OpSum()
+    Qz_os = OpSum()
+
+    # Dynamical matter charges to the left of the cut
+    for i in 0:x
+
+        Qx_os +=  0.5, "S-", r(i), "S+", g(i)
+        Qx_os +=  0.5, "S+", r(i), "S-", g(i)
+
+        Qy_os += -0.5im, "S-", r(i), "S+", g(i)
+        Qy_os +=  0.5im, "S+", r(i), "S-", g(i)
+
+        Qz_os +=  0.25, "Z", g(i)
+        Qz_os += -0.25, "Z", r(i)
+
+    end
+
+    # Include external charges once they are to the left of the cut
+    if n1 <= x
+        Qx_os += 1.0, "Sx", ext1_ind
+        Qy_os += 1.0, "Sy", ext1_ind
+        Qz_os += 1.0, "Sz", ext1_ind
+    end
+
+    if n2 <= x
+        Qx_os += 1.0, "Sx", ext2_ind
+        Qy_os += 1.0, "Sy", ext2_ind
+        Qz_os += 1.0, "Sz", ext2_ind
+    end
+
+    return MPO(Qx_os, sites),
+           MPO(Qy_os, sites),
+           MPO(Qz_os, sites)
+end
+
+
+# Calculate <L_x^2 + L_y^2 + L_z^2> at each cut
+
+flux_squared = zeros(Float64, N)
+
+for x in 0:N-1
+
+    Lx, Ly, Lz = cumulative_colour_operators(sites, x)
+
+    Fx = real(inner(Lx, psi, Lx, psi))
+    Fy = real(inner(Ly, psi, Ly, psi))
+    Fz = real(inner(Lz, psi, Lz, psi))
+
+    flux_squared[x+1] = Fx + Fy + Fz
+
+end
+
+# Plot the electric flux
+
+plot(0:N-1, flux_squared,
+     marker=:circle,
+     linewidth=2,
+     xlabel="Position x",
+     ylabel="⟨L²(x)⟩",
+     title="Electric flux profile",
+     label="Electric flux",
+     legend=:topright)
+
+# Mark external charge positions
+vline!([n1, n2],
+       linestyle=:dash,
+       linewidth=2,
+       label="External charges")
+
 end
