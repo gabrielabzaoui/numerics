@@ -150,7 +150,7 @@ end
     H_mpo_total=add(H_ferm,electric_mpo(N),cutoff=1e-12)
     
     psi_0=random_mps(sites)
-    E_0,psi=dmrg(H_mpo_total,psi_0;nsweeps=12,cutoff=1e-12,maxdim=200)
+    @time E_0,psi=dmrg(H_mpo_total,psi_0;nsweeps=12,cutoff=1e-12,maxdim=200)
     z_values = expect(psi, "Z")
 
     n_r = [(1-z_values[2*i+1])/2 for i in 0:N-1]
@@ -165,4 +165,7 @@ end
     p3=plot(L2_vals,marker="circle",label="L^2")
     
     plot(p1, p2, p3, layout=(3,1), size=(700,900))
+    f = h5open("myfile.h5","w") do f
+           write(f,"psi",psi)
+       end
 end
