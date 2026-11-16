@@ -2,21 +2,21 @@ using ITensors
 using ITensorMPS
 using Plots
 begin
-    N=20 #number of staggered fermionic sites 
+    N=15 #number of staggered fermionic sites 
         #red odd sites, green even sites 1=red_site 1 2=green site 1
     sites=siteinds("S=1/2",2*N+2);#+2 external charges
     H=OpSum()
     number_of_sites=2*N
     
-    m=1
+    m=5
     r(i) = 2*i + 1
     g(i) = 2*i + 2
-    g_coupling=1
+    g_coupling=2
     a=1
     epsilon=1/(2*a)
     ext1_ind=2*N+1  #index of the external charges
     ext2_ind=2*N+2
-    n1=4 #postion of external charge 1 model before the jordan wigner transform
+    n1=5 #postion of external charge 1 model before the jordan wigner transform
     n2=10 #" chrage 2 "
     lambda = a * g_coupling^2
     function number_r(sites, i)
@@ -200,7 +200,7 @@ psi_0 = random_mps(sites)
 E_0, psi = dmrg(H_mpo, psi_0;
                 nsweeps=20,
                 cutoff=1e-12,
-                maxdim=400)
+                maxdim=200)
 
 # ============================================
 # Measure total colour

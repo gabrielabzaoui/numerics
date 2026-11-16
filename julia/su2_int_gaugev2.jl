@@ -3,7 +3,7 @@ using ITensorMPS
 using Plots
 begin
     #OBC !
-    N=20 #number of fermion sites
+    N=15 #number of fermion sites
     N_spinsites=2*N+2 # number of spin sites after jordan-wigner transform + 2 external charges
     sites=siteinds("S=1/2",N_spinsites)
     n1=4 # postion of external charges before JW transform
@@ -16,11 +16,11 @@ begin
     # paramteres
     a_0=1
     m=1
-    g_coupling=2
+    g_coupling=3
     H=OpSum()
     lambda_kin=1/(2*a_0)
     lambda_mass=m*0.5
-    lambda_elec=0.5*a_0*g^2
+    lambda_elec=0.5*a_0*g_coupling^2
     
     #hopping term
     for n=0:N-1
@@ -34,30 +34,31 @@ begin
     
     #mass term
     for n=0:N-1
-        global H+=2*lambda_mass*(-1)^n,"Id"
+        global H+=1*lambda_mass*(-1)^n,"Id",r(n)
+        global H+=1*lambda_mass*(-1)^n,"Id",g(n)
         global H+=-(-1)^n*lambda_mass,"Z",r(n)
         global H+=-(-1)^n*lambda_mass,"Z",g(n)
     end
     #charge operator acting on external charges
     #n1
     qx_n1=OpSum()
-    qx_n1+="Sx",n1_spin
+    qx_n1+=1.0,"Sx",n1_spin
     
     qy_n1=OpSum()
-    qy_n1+="Sy",n1_spin
+    qy_n1+=1.0,"Sy",n1_spin
         
     qz_n1=OpSum()
-    qz_n1+="Sx",n1_spin
+    qz_n1+=1.0,"Sz",n1_spin
     
     #n2
     qx_n2=OpSum()
-    qx_n2+="Sx",n2_spin
+    qx_n2+=1.0,"Sx",n2_spin
     
     qy_n2=OpSum()
-    qy_n2+="Sy",n2_spin
+    qy_n2+=1.0,"Sy",n2_spin
         
     qz_n2=OpSum()
-    qz_n1+="Sx",n2_spin
+    qz_n1+=1.0,"Sz",n2_spin
     
     function Q_x(n)
         op=OpSum()
@@ -77,57 +78,91 @@ begin
         op+=0.25,"Z",g(n)
         return op
     end
-    function cum_Q_sum(n) #cumulative sum smaller than n
+    function cum_Q_sum(n,seiten) #cumulative sum smaller than n
         Sx=OpSum()
         Sy=OpSum()
         Sz=OpSum()
         for i=0:n-1
-            global Sx+=Q_x(i)
-            global Sy+=Q_y(i)
-            global Sz+=Q_z(i)
-            if m==n1
+             Sx+=Q_x(i)
+             Sy+=Q_y(i)
+             Sz+=Q_z(i)
+            if i==n1
                 
                 
-                global Sx+=qx_n1
+                 Sx+=qx_n1
 
                 
-                global Sy+=qy_n1
+                 Sy+=qy_n1
 
                 
-                global Sz+=qz_n1
+                 Sz+=qz_n1
                 
-            elseif m==n2
+            elseif i==n2
                 
-                global Sx+=qx_n2
+                 Sx+=qx_n2
 
                 
-                global Sy+=qy_n2
+                 Sy+=qy_n2
 
                 
-                global Sz+=qz_n2
+                 Sz+=qz_n2
                 
             end
         end
 
-        return Sx,Sy,Sz
+        return MPO(Sx,seiten),MPO(Sy,seiten),MPO(Sz,seiten)
     
     end
-    #electric energy 
-    for n=0:N-1
-        Sx,Sy,Sz=cum_Q_sum(n)
-        global H+=lambda_elec*(Sx*Sx+Sy*Sy+Sz*Sz)
     
+function electric_mpo(N)
+    H_E = nothing
+
+    for n = 1:N-1
+        Mx, My, Mz = cum_Q_sum(n,sites)
+
+        Lx2 = apply(Mx, Mx; cutoff=1e-12)
+        Ly2 = apply(My, My; cutoff=1e-12)
+        Lz2 = apply(Mz, Mz; cutoff=1e-12)
+
+        L2 = add(Lx2, Ly2; cutoff=1e-12)
+        L2 = add(L2, Lz2; cutoff=1e-12)
+
+        if H_E === nothing
+            H_E = L2
+        else
+            H_E = add(H_E, L2; cutoff=1e-12) #H_E is an MPO
+        end
     end
-    function Ln2(n)
-        Lxn,Lyn,Lzn=cum_Q_sum(n)
-        return Lxn*Lxn+Lyn*Lyn+Lzn*Lzn
-    end
-    H_mpo=MPO(H,sites)
+
+    return H_E
+end
+function Ln_sqr(n)
+    Lx,Ly,Lz=cum_Q_sum(n,sites)
+    Lx2=apply(Lx,Lx;cutoff=1e-12)
+    Lz2=apply(Lz,Lz;cutoff=1e-12)
+    Ly2=apply(Ly,Ly;cutoff=1e-12)
+    Ln2=add(Lx2,Ly2;cutoff=1e-12)
+    Ln2=add(Ln2,Lz2;cutoff=1e-12)
+    return Ln2
+end
+   
+    H_ferm=MPO(H,sites)
+    H_mpo_total=add(H_ferm,electric_mpo(N),cutoff=1e-12)
+    
     psi_0=random_mps(sites)
-    E_0,psi=dmrg(H_mpo,psi_0;Sweeps=12;cutoff=1e-12)
+    E_0,psi=dmrg(H_mpo_total,psi_0;nsweeps=12,cutoff=1e-12,maxdim=200)
     z_values = expect(psi, "Z")
 
     n_r = [(1-z_values[2*i+1])/2 for i in 0:N-1]
-n_g = [(1-z_values[2*i+2])/2 for i in 0:N-1]
-plot(n_r)
+    n_g = [(1-z_values[2*i+2])/2 for i in 0:N-1]
+    L2_vals=Float64[]
+    @time for i=1:N-1
+        val=inner(psi,apply(Ln_sqr(i),psi))
+        push!(L2_vals,real(val))
+    end
+    p1=scatter(n_r,color="red",label="occupation red")
+    p2=scatter(n_g,color="lightgreen",label="occupation green")
+    p3=plot(L2_vals,marker="circle",label="L^2")
+    
+    plot(p1, p2, p3, layout=(3,1), size=(700,900))
 end
