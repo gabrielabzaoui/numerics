@@ -16,8 +16,8 @@ begin
     g(n)=2*n+2
     # paramteres
     a_0=1
-    m=0.5
-    g_coupling=4
+    m=1
+    g_coupling=3
     H=OpSum()
     lambda_kin=1/(2*a_0)
     lambda_mass=m*0.5
@@ -26,11 +26,11 @@ begin
     #hopping term
     for n=0:N-2
         global H+=lambda_kin,"S+",r(n+1),"Z",g(n),"S-",r(n)
-        global H+=lambda_kin,"S+",g(n+1),"Z",r(n),"S-",g(n)
+        global H+=lambda_kin,"S+",g(n+1),"Z",r(n+1),"S-",g(n)
         
         # and the h.c.
         global H+=lambda_kin,"S-",r(n+1),"Z",g(n),"S+",r(n)
-        global H+=lambda_kin,"S-",g(n+1),"Z",r(n),"S+",g(n)
+        global H+=lambda_kin,"S-",g(n+1),"Z",r(n+1),"S+",g(n)
     end
     
     #mass term
@@ -182,7 +182,7 @@ end
     H_mpo_total=add(H_ferm,lambda_elec*electric_mpo(N),cutoff=1e-12)
     H_mpo_total=add(H_mpo_total,H_penalty)
     psi_0=random_mps(sites)
-    @time E_0,psi=dmrg(H_mpo_total,psi_0;nsweeps=12,cutoff=1e-12,maxdim=200)
+    @time E_0,psi=dmrg(H_mpo_total,psi_0;nsweeps=20,cutoff=1e-12,maxdim=200)
     z_values = expect(psi, "Z")
 
     n_r = [(1-z_values[2*i+1])/2 for i in 0:N-1]
@@ -204,8 +204,12 @@ end
        linestyle=:dash,
        linewidth=2,
        label="External charges")
-    plot(p1, p2, p3, layout=(3,1), size=(700,900))
+    p=plot(p1, p2, p3, layout=(3,1), size=(700,900))
+    savefig(p,"su2_calc.pdf")
     #f = h5open("myfile.h5","w") do f
      #      write(f,"psi",psi)
+     println("Qx^2=",inner(Qx,psi,Qx,psi))
+     println("Qy^2=",inner(Qy,psi,Qy,psi))
+     println("Qz^2=",inner(Qz,psi,Qz,psi))
       # end
 end
