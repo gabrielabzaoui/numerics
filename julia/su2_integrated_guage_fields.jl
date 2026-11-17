@@ -8,7 +8,7 @@ begin
     H=OpSum()
     number_of_sites=2*N
     
-    m=5
+    m=1
     r(i) = 2*i + 1
     g(i) = 2*i + 2
     g_coupling=2
@@ -198,7 +198,7 @@ H_mpo = add(H_base, H_penalty;
 psi_0 = random_mps(sites)
 
 E_0, psi = dmrg(H_mpo, psi_0;
-                nsweeps=20,
+                nsweeps=12,
                 cutoff=1e-12,
                 maxdim=200)
 
@@ -298,19 +298,16 @@ end
 
 # Plot the electric flux
 
-plot(0:N-1, flux_squared,
-     marker=:circle,
-     linewidth=2,
-     xlabel="Position x",
-     ylabel="⟨L²(x)⟩",
-     title="Electric flux profile",
-     label="Electric flux",
-     legend=:topright)
-
+p1=scatter(n_r,color="red",label="occupation red")
+    p2=scatter(n_g,color="lightgreen",label="occupation green")
+    p3=plot(flux_squared,marker="circle",label="L^2")
+    
+    
 # Mark external charge positions
 vline!([n1, n2],
        linestyle=:dash,
        linewidth=2,
        label="External charges")
+plot(p1, p2, p3, layout=(3,1), size=(700,900))
 
 end
