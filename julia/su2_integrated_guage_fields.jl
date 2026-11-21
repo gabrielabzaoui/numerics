@@ -1,8 +1,9 @@
 using ITensors
 using ITensorMPS
-using Plots
+using CUDA,HDF5
+#using Plots
 begin
-    N=15 #number of staggered fermionic sites 
+    N=20 #number of staggered fermionic sites 
         #red odd sites, green even sites 1=red_site 1 2=green site 1
     sites=siteinds("S=1/2",2*N+2);#+2 external charges
     H=OpSum()
@@ -16,8 +17,8 @@ begin
     epsilon=1/(2*a)
     ext1_ind=2*N+1  #index of the external charges
     ext2_ind=2*N+2
-    n1=5 #postion of external charge 1 model before the jordan wigner transform
-    n2=10 #" chrage 2 "
+    n1=parse(Int,ARGS[1])#postion of external charge 1 model before the jordan wigner transform
+    n2=16 #" chrage 2 "
     lambda = a * g_coupling^2
     function number_r(sites, i)
         os = OpSum()
@@ -196,12 +197,14 @@ H_mpo = add(H_base, H_penalty;
 # ============================================
 
 psi_0 = random_mps(sites)
-
-E_0, psi = dmrg(H_mpo, psi_0;
-                nsweeps=12,
-                cutoff=1e-12,
-                maxdim=200)
-
+H_gpu=cu(H_mpo)
+psi_0gpu=cu(psi_0)
+E_0, psi_gpu = dmrg(H_gpu, psi_0gpu;
+                nsweeps=100,
+                cutoff=1e-14,
+                maxdim=800)
+CUDA.synchronize()
+psi=cpu(psi_gpu)
 # ============================================
 # Measure total colour
 # ============================================
@@ -225,17 +228,17 @@ z_values = expect(psi, "Z")
 
 n_r = [(1-z_values[2*i+1])/2 for i in 0:N-1]
 n_g = [(1-z_values[2*i+2])/2 for i in 0:N-1]
-
-scatter(1:N, n_r,
+"""
+#scatter(1:N, n_r,
         marker=:square,
         color="red",
         label="n_r")
 
-scatter!(1:N, n_g,
+#scatter!(1:N, n_g,
          marker=:circle,
          color="lightgreen",
          label="n_g")
-
+"""
 
 # ============================================
 # Electric flux profile
@@ -283,7 +286,9 @@ end
 # Calculate <L_x^2 + L_y^2 + L_z^2> at each cut
 
 flux_squared = zeros(Float64, N)
-
+Lx_op=MPO[]
+Ly_op=MPO[]
+Lz_op=MPO[]
 for x in 0:N-1
 
     Lx, Ly, Lz = cumulative_colour_operators(sites, x)
@@ -293,11 +298,64 @@ for x in 0:N-1
     Fz = real(inner(Lz, psi, Lz, psi))
 
     flux_squared[x+1] = Fx + Fy + Fz
+    push!(Lx_op,Lx)
+    push!(Ly_op,Ly)
+    push!(Lz_op,Lz)
+end
+output_file = "SU2_N$(N)_n1$(n1)_n2$(n2).h5"
 
+h5open(output_file, "w") do f
+
+    # Ground state
+    write(f, "psi", psi)
+
+    # Energy
+    write(f, "E0", E_0)
+
+    # Matter occupation
+    write(f, "n_r", n_r)
+    write(f, "n_g", n_g)
+
+    # Electric flux
+    write(f, "flux_squared", flux_squared)
+
+    # Total colour charge
+    write(f, "Qx2", Qx2)
+    write(f, "Qy2", Qy2)
+    write(f, "Qz2", Qz2)
+    write(f, "Qtotal2", Qtotal2)
+
+    # Physical parameters
+    write(f, "N", N)
+    write(f, "n1", n1)
+    write(f, "n2", n2)
+    
+    write(f, "m", m)
+    write(f, "g_coupling", g_coupling)
+    write(f, "a", a)
+    write(f, "lambda", lambda)
+    write(f, "kappa", kappa)
+    for x in 1:N
+        write(f, "Lx_$x", Lx_op[x])
+        write(f, "Ly_$x", Ly_op[x])
+        write(f, "Lz_$x", Lz_op[x])
+    end
+    # DMRG parameters
+    write(f, "nsweeps", 100)
+write(f, "maxdim", 800)
+write(f, "cutoff", 1e-14)
+    """
+    write(f, "nsweeps", 12)
+    write(f, "maxdim", 200)
+    write(f, "cutoff", 1e-12)
+    """
+    # Mapping information
+    write(f, "MPS_ordering", "r(0),g(0),r(1),g(1),...,external1,external2")
 end
 
+println("Saved results to ", output_file)
 # Plot the electric flux
-
+#=
 p1=scatter(n_r,color="red",label="occupation red")
     p2=scatter(n_g,color="lightgreen",label="occupation green")
     p3=plot(flux_squared,marker="circle",label="L^2")
@@ -309,5 +367,5 @@ vline!([n1, n2],
        linewidth=2,
        label="External charges")
 plot(p1, p2, p3, layout=(3,1), size=(700,900))
-
+=#
 end
