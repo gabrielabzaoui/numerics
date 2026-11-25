@@ -3,7 +3,7 @@ using Plots
 using Random
 Random.seed!(1234)
 begin
-    N=4
+    N=20
     sites=siteinds("S=1/2",N)
     h=2
     H=OpSum()
@@ -93,6 +93,6 @@ begin
         #println(scalar(Q))
         return -log2(real(scalar(Q))/2^N)
     end
-    @time println(M_2(mps_to_vector(psi)))
+    #@time println(M_2(mps_to_vector(psi)))
     @time println(M_2_mps(psi))
 end
